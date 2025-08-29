@@ -8,6 +8,7 @@ import jwt from "jsonwebtoken";
 import Barber from "../model/barber.js";
 import connectDB from "./db.js";
 import Service from "../model/service.js";
+import ServiceTiming from "../model/slot.js";
 
 dotenv.config();
 
@@ -52,28 +53,32 @@ const authenticateCustomer = async (req, res, next) => {
 const authenticateBarber = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
+
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ message: "No token provided" });
     }
 
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // ✅ Extract token correctly
+    const barberToken = authHeader.split(" ")[1];
 
+    // ✅ Verify token
+    const decoded = jwt.verify(barberToken, process.env.JWT_SECRET);
+
+    // ✅ Find barber in DB
     const barber = await Barber.findById(decoded.id).select("-password");
     if (!barber) {
       return res.status(401).json({ message: "Barber not found" });
     }
 
-    req.barber = barber; // attach barber
+    req.barber = barber; // attach barber object to request
     next();
   } catch (error) {
     console.error("❌ Barber Auth Error:", error.message);
     res.status(401).json({ message: "Not authorized, invalid token" });
   }
 };
-
-// ------------------- CUSTOMER ROUTES -------------------
-
+// ------------------- ROUTES -------------------
+// Register Customer
 app.post("/api/customers/register", async (req, res) => {
   try {
     const { first_name, last_name, email, password, phone, gender } = req.body;
@@ -294,6 +299,7 @@ app.post("/api/customers/login", async (req, res) => {
         id: customer._id,
         first_name: customer.first_name,
         last_name: customer.last_name,
+        gender:customer.gender,
         email: customer.email,
         phone: customer.phone,
         is_active: customer.is_active,
@@ -327,13 +333,26 @@ app.get("/api/getservice", async (req, res) => {
 //add service
 app.post("/api/addservice", authenticateBarber, async (req, res) => {
   try {
-    const { name, price, duration } = req.body;
+    const { name, price, duration, gender } = req.body;
 
-    if (!name || !price || !duration) {
-      return res.status(400).json({ success: false, message: "Please provide name, price, and duration" });
+    // Validate required fields
+    if (!name || !price || !duration || !gender) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide name, price, duration, and gender",
+      });
     }
 
-    const newService = new Service({ name, price, duration });
+    // Validate gender
+    const allowedGenders = ["Male", "Female", "Unisex"];
+    if (!allowedGenders.includes(gender)) {
+      return res.status(400).json({
+        success: false,
+        message: "Gender must be 'Male', 'Female', or 'Unisex'",
+      });
+    }
+
+    const newService = new Service({ name, price, duration, gender });
     await newService.save();
 
     res.status(201).json({
@@ -352,14 +371,24 @@ app.post("/api/addservice", authenticateBarber, async (req, res) => {
 });
 
 
-app.put("/api/editservice/:id", authenticateBarber, async (req, res) => {
+
+app.put("/api/updateservice/:id", authenticateBarber, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, price, duration } = req.body;
+    const { name, price, duration, gender } = req.body;
+
+    // Validate gender if provided
+    const allowedGenders = ["Male", "Female", "Unisex"];
+    if (gender && !allowedGenders.includes(gender)) {
+      return res.status(400).json({
+        success: false,
+        message: "Gender must be 'Male', 'Female', or 'Unisex'",
+      });
+    }
 
     const updatedService = await Service.findByIdAndUpdate(
       id,
-      { name, price, duration },
+      { name, price, duration, ...(gender && { gender }) },
       { new: true, runValidators: true }
     );
 
@@ -381,6 +410,8 @@ app.put("/api/editservice/:id", authenticateBarber, async (req, res) => {
     });
   }
 });
+
+
 
 // ✅ Delete a service (Barber only)
 app.delete("/api/deleteservice/:id", authenticateBarber, async (req, res) => {
@@ -407,6 +438,40 @@ app.delete("/api/deleteservice/:id", authenticateBarber, async (req, res) => {
     });
   }
 });
+
+// ✅ Get services based on customer's gender (Customer only)
+app.get("/api/services/by-gender/:gender", authenticateCustomer, async (req, res) => {
+  try {
+    const customerGender = req.params.gender; // comes from authenticateCustomer
+
+    if (!customerGender) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer gender not found",
+      });
+    }
+
+    // ✅ Services that match customer's gender OR Unisex
+    const services = await Service.find({
+      $or: [{ gender: customerGender }, { gender: "Unisex" }],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: services,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching services by gender:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+});
+
+
+
 
 
 

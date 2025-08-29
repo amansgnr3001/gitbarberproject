@@ -4,7 +4,7 @@ import { Scissors, Mail, Lock, User, Phone, ArrowLeft } from "lucide-react";
 import { signupCustomer, loginCustomer } from "../HandleApi"; // <-- make sure login API exists
 
 // ✅ define a proper type for formData
-type Gender = "Male" | "Female" | "Other" | ""; // allow empty for select
+type Gender = "Male" | "Female" | "Unisex" ; // allow empty for select
 interface CustomerFormData {
   first_name: string;
   last_name: string;
@@ -18,15 +18,16 @@ interface CustomerFormData {
 const CustomerAuth = () => {
   const [isLogin, setIsLogin] = useState(true);
 
-  const [formData, setFormData] = useState<CustomerFormData>({
-    first_name: "",
-    last_name: "",
-    gender: "",
-    email: "",
-    phone: "",
-    password: "",
-    confirmPassword: "",
-  });
+ const [formData, setFormData] = useState<CustomerFormData>({
+  first_name: "",
+  last_name: "",
+  gender: "" as "Male" | "Female" | "Unisex", // ✅ single string, not array
+  email: "",
+  phone: "",
+  password: "",
+  confirmPassword: "",
+});
+
 
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -52,7 +53,7 @@ const CustomerAuth = () => {
       response = await signupCustomer({
         first_name: formData.first_name,
         last_name: formData.last_name,
-        gender: formData.gender as "Male" | "Female" | "Other",
+        gender: formData.gender as "Male" | "Female" | "Unisex", // cast to valid type
         email: formData.email,
         phone: formData.phone,
         password: formData.password,
@@ -61,7 +62,10 @@ const CustomerAuth = () => {
 
     // ✅ Save token & customer data in localStorage
     localStorage.setItem("customerToken", response.token);
-    localStorage.setItem("customerData", JSON.stringify(response.customer.id));
+    localStorage.setItem("customerData", JSON.stringify({
+  id: response.customer.id,
+  gender: response.customer.gender,   // ✅ store gender
+}));
 
     // ✅ Redirect
     navigate("/customer/dashboard");

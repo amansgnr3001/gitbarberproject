@@ -6,19 +6,22 @@ import BarberAuth from './pages/BarberAuth';
 import CustomerDashboard from './pages/CustomerDashboard';
 import BarberDashboard from './pages/BarberDashboard';
 import Services from './pages/Services';   
+import CustomerServices from './pages/CustomerServices';
 
 function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gray-50">
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/customer/auth" element={<CustomerAuth />} />
-          <Route path="/barber/auth" element={<BarberAuth />} />
-          <Route path="/customer/dashboard" element={<CustomerDashboard />} />
-          <Route path="/barber/dashboard" element={<BarberDashboard />} />
-          <Route path="/barber/services" element={<Services />} /> {/* ✅ Route */}
-        </Routes>
+      <Routes>
+  <Route path="/" element={<LandingPage />} />
+  <Route path="/customer/auth" element={<CustomerAuth />} />
+  <Route path="/barber/auth" element={<BarberAuth />} />
+  <Route path="/customer/dashboard" element={<CustomerDashboard />} />
+  <Route path="/customer/services" element={<CustomerServices />} /> {/* ✅ Customer Services */}
+  <Route path="/barber/dashboard" element={<BarberDashboard />} />
+  <Route path="/barber/services" element={<Services />} /> {/* ✅ Barber Services */}
+</Routes>
+
       </div>
     </Router>
   );

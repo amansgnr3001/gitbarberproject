@@ -15,15 +15,21 @@ const serviceSchema = new mongoose.Schema(
       min: 0
     },
     duration: {
-      type: Number, // duration in minutes/hours (decide your unit)
+      type: Number, // duration in minutes/hours
       required: true,
       min: 1
+    },
+    gender: {
+      type: String,
+      enum: ["Male", "Female", "Unisex"], // restrict values
+      required: true
     }
   },
   {
     timestamps: true // adds createdAt & updatedAt fields automatically
   }
 );
+
 
 // Create the model
 const Service = mongoose.model("Service", serviceSchema);
