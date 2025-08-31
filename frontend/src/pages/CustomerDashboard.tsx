@@ -39,13 +39,13 @@ const CustomerDashboard = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
         <div className="grid md:grid-cols-3 gap-4">
-          <button
-            className="bg-amber-600 text-white p-6 rounded-xl hover:bg-amber-700 transition-colors"
-          >
-            <Plus className="h-8 w-8 mx-auto mb-2" />
-            <span className="block font-semibold">Book Appointment</span>
-          </button>
-
+        <button
+  onClick={() => navigate("/customer/book-appointment")}
+  className="bg-amber-600 text-white p-6 rounded-xl hover:bg-amber-700 transition-colors"
+>
+  <Plus className="h-8 w-8 mx-auto mb-2" />
+  <span className="block font-semibold">Book Appointment</span>
+</button>
           <button
             onClick={() => navigate("/customer/services")}
             className="bg-white border border-gray-200 p-6 rounded-xl hover:shadow-md transition-shadow"

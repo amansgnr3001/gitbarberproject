@@ -9,6 +9,7 @@ import Barber from "../model/barber.js";
 import connectDB from "./db.js";
 import Service from "../model/service.js";
 import ServiceTiming from "../model/slot.js";
+import cron from "node-cron";
 
 dotenv.config();
 
@@ -470,12 +471,219 @@ app.get("/api/services/by-gender/:gender", authenticateCustomer, async (req, res
   }
 });
 
+//get timeslots
+app.get("/api/service-timings", async (req, res) => {
+  try {
+    const timings = await ServiceTiming.findOne();
+    console.log(timings);
+    
+
+    const formattedTimings = timings.map((timing) => ({
+      morning: {
+        startTime: timing.morning.startTime,
+        endTime: timing.morning.endTime,
+      },
+      evening: {
+        startTime: timing.evening.startTime,
+        endTime: timing.evening.endTime,
+      },
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: formattedTimings,
+    });
+  } catch (err) {
+    console.error("❌ Error fetching service timings:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch service timings",
+    });
+  }
+});
+
+//update timeslot
+app.post("/api/update-timeslot", async (req, res) => {
+  try {
+    const { slot, duration } = req.body;
+
+    if (!["morning", "evening"].includes(slot)) {
+      return res.status(400).json({ success: false, message: "Invalid slot type" });
+    }
+    if (!duration || duration <= 0) {
+      return res.status(400).json({ success: false, message: "Invalid duration" });
+    }
+
+    // Fetch timings (you can extend this with user/business id)
+    const timing = await ServiceTiming.findOne();
+    if (!timing) {
+      return res.status(404).json({ success: false, message: "No timing found" });
+    }
+
+    const currentStart = timing[slot].startTime; // e.g. 540 (09:00)
+    const currentEnd = timing[slot].endTime;     // e.g. 720 (12:00)
+    const newStart = currentStart + duration;
+
+    if (newStart > currentEnd) {
+      return res.status(400).json({ success: false, message: "No available slot" });
+    }
+
+    // ✅ Save the booking slot (currentStart → newStart)
+    const bookedSlot = {
+      startTime: currentStart,
+      endTime: newStart,
+    };
+
+    // Move the slot forward for the next booking
+    timing[slot].startTime = newStart;
+    await timing.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Booked ${slot} slot successfully`,
+      data: bookedSlot, // return actual booked slot
+    });
+  } catch (err) {
+    console.error("❌ Error updating time slot:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+//reset timeslots daily
+
+app.post("/api/reset-timeslot", async (req, res) => {
+  try {
+    const today = new Date();
+    const todayStr = today.toDateString(); // e.g., "Sat Aug 30 2025"
+
+    // Fetch the first timing document
+    let timing = await ServiceTiming.findOne();
+
+    if (!timing) {
+      // If no document exists, create one with initial values
+      timing = new ServiceTiming({
+        morning: { startTime: 540, endTime: 720 }, // 9:00 AM to 12:00 PM
+        evening: { startTime: 870, endTime: 1020 }, // 2:30 PM to 5:00 PM
+        lastResetDate: todayStr,
+      });
+      await timing.save();
+      return res.status(200).json({
+        success: true,
+        message: "Time slots initialized for today",
+        data: timing,
+      });
+    }
+
+    // Check last reset date
+    if (timing.lastResetDate === todayStr) {
+      return res.status(200).json({
+        success: true,
+        message: "Time slots already reset today",
+        data: timing,
+      });
+    }
+
+    // Reset start times to initial values
+    timing.morning.startTime = 540; // 9:00 AM in minutes
+    timing.evening.startTime = 870; // 2:30 PM in minutes
+    timing.lastResetDate = todayStr;
+
+    await timing.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Time slots reset for today",
+      data: timing,
+    });
+  } catch (err) {
+    console.error("❌ Error resetting time slots:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+cron.schedule("0 0 * * *", async () => {
+  try {
+    const today = new Date().toDateString();
+    let timing = await ServiceTiming.findOne();
+
+    if (!timing) {
+      timing = new ServiceTiming({
+        morning: { startTime: 540, endTime: 720 },
+        evening: { startTime: 870, endTime: 1020 },
+        lastResetDate: today,
+      });
+      await timing.save();
+      console.log("✅ Initialized timings at midnight");
+      return;
+    }
+
+    if (timing.lastResetDate !== today) {
+      timing.morning.startTime = 540;
+      timing.evening.startTime = 870;
+      timing.lastResetDate = today;
+      await timing.save();
+      console.log("✅ Slots reset automatically at midnight");
+    }
+  } catch (err) {
+    console.error("❌ Cron reset failed:", err.message);
+  }
+});
 
 
+app.post("/api/bookings", authenticateCustomer, async (req, res) => {
+  try {
+    const {
+      name,
+      phoneNumber,
+      email,
+      gender,
+      services,
+      slotPeriod,
+      timeSlot,
+      totalCost,
+    } = req.body;
+
+    if (
+      !name ||
+      !phoneNumber ||
+      !email ||
+      !gender ||
+      !services ||
+      !slotPeriod ||
+      !timeSlot ||
+      !totalCost
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Please provide all required fields" });
+    }
+
+    const booking = new Booking({
+      customerId: req.customer._id, // from token
+      name,
+      phoneNumber,
+      email,
+      gender,
+      services,
+      slotPeriod,
+      timeSlot,
+      totalCost,
+    });
+
+    await booking.save();
+
+    res.status(201).json({
+      message: "Booking created successfully",
+      booking,
+    });
+  } catch (error) {
+    console.error("❌ Booking Error:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 
 
 
 // ------------------- SERVER -------------------
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));   

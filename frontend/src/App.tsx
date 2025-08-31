@@ -7,6 +7,7 @@ import CustomerDashboard from './pages/CustomerDashboard';
 import BarberDashboard from './pages/BarberDashboard';
 import Services from './pages/Services';   
 import CustomerServices from './pages/CustomerServices';
+import BookAppointment from './form/BookAppointment';
 
 function App() {
   return (
@@ -19,7 +20,8 @@ function App() {
   <Route path="/customer/dashboard" element={<CustomerDashboard />} />
   <Route path="/customer/services" element={<CustomerServices />} /> {/* ✅ Customer Services */}
   <Route path="/barber/dashboard" element={<BarberDashboard />} />
-  <Route path="/barber/services" element={<Services />} /> {/* ✅ Barber Services */}
+  <Route path="/barber/services" element={<Services />} />  
+  <Route path="/customer/book-appointment" element={<BookAppointment />} />
 </Routes>
 
       </div>

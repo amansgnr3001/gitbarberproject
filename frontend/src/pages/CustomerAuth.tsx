@@ -32,7 +32,7 @@ const CustomerAuth = () => {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+ const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   setError(null);
 
@@ -53,7 +53,7 @@ const CustomerAuth = () => {
       response = await signupCustomer({
         first_name: formData.first_name,
         last_name: formData.last_name,
-        gender: formData.gender as "Male" | "Female" | "Unisex", // cast to valid type
+        gender: formData.gender as "Male" | "Female" | "Unisex",
         email: formData.email,
         phone: formData.phone,
         password: formData.password,
@@ -62,18 +62,16 @@ const CustomerAuth = () => {
 
     // ✅ Save token & customer data in localStorage
     localStorage.setItem("customerToken", response.token);
-    localStorage.setItem("customerData", JSON.stringify({
-  id: response.customer.id,
-  gender: response.customer.gender,   // ✅ store gender
-}));
 
-    // ✅ Redirect
+    // ✅ Save entire customer object (all details)
+    localStorage.setItem("customerData", JSON.stringify(response.customer));
+
+    // ✅ Redirect to dashboard
     navigate("/customer/dashboard");
   } catch (err: any) {
     setError(err.response?.data?.message || "Something went wrong");
   }
 };
-
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
