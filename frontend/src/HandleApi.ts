@@ -214,94 +214,95 @@ export const getServicesByGender = async () => {
 };
 
 //slot api
+// ✅ Get service timings
 export const getServiceTimings = async () => {
   try {
     const customerToken = localStorage.getItem("customerToken");
     if (!customerToken) throw new Error("No customer token found. Please login again.");
 
     const response = await api.get("/service-timings", {
-      headers: {
-        Authorization: `Bearer ${customerToken}`,
-      },
+      headers: { Authorization: `Bearer ${customerToken}` },
     });
 
-    return response.data; // { success: true, data: {...} }
+    return response.data; // { success: true, data: { morning, evening } }
   } catch (error: any) {
     console.error("❌ Error fetching service timings:", error.response?.data || error.message);
     throw error;
   }
 };
 
-export const bookAppointment = async (slot: "morning" | "evening", duration: number) => {
+// ✅ Reserve a slot
+export const bookAppointment = async ({
+  slot,
+  duration,
+}: {
+  slot: "morning" | "evening";
+  duration: number;
+}) => {
   const customerToken = localStorage.getItem("customerToken");
   if (!customerToken) throw new Error("No customer token found");
 
   const response = await api.post(
     "/update-timeslot",
     { slot, duration },
-    {
+    { headers: { Authorization: `Bearer ${customerToken}` } }
+  );
+
+  return response.data; // { success, message, data: { startTime, endTime } }
+};
+
+// ✅ Finalize booking
+ 
+
+export const bookAppointment2 = async (bookingPayload: any) => {
+  try {
+    const customerToken = localStorage.getItem("customerToken");
+    
+    if (!customerToken) {
+      throw new Error("No customer token found. Please login again.");
+    }
+
+    const response = await api.post("/bookings", bookingPayload, {
       headers: {
         Authorization: `Bearer ${customerToken}`,
       },
-    }
-  );
-
-  return response.data;
-};
-
-
-
-export const bookAppointment2 = async (
-  slotPeriod: string,
-  totalDuration: number,
-  chosenServices: { _id: string; name: string; duration: number; cost: number }[],
-  timeSlot: { startTime: number; endTime: number }
-) => {
-  try {
-    const customerToken = localStorage.getItem("customerToken");
-    const customerDataString = localStorage.getItem("customerData");
-
-    if (!customerToken || !customerDataString) {
-      throw new Error("No customer data or token found. Please login again.");
-    }
-
-    const customerData = JSON.parse(customerDataString);
-
-    const totalCost = chosenServices.reduce((sum, s) => sum + (s.cost || 0), 0);
-
-    const payload = {
-      name: customerData.first_name + " " + customerData.last_name,
-      phoneNumber: customerData.phoneNumber,
-      email: customerData.email,
-      gender: customerData.gender,
-      slotPeriod,
-      timeSlot: {
-        startTime: timeSlot.startTime,
-        endTime: timeSlot.endTime,
-      },
-      totalCost,
-      services: chosenServices.map((s) => ({
-        serviceId: s._id,
-        name: s.name,
-        price: s.cost,          // ✅ FIX: schema requires price
-        duration: s.duration,
-      })),
-    };
-
-    console.log("📦 Sending booking payload:", payload);
-
-    const response = await api.post("/bookings", payload, {
-      headers: { Authorization: `Bearer ${customerToken}` },
     });
 
-    return { success: true, data: response.data };
-  } catch (err: any) {
-    console.error("❌ Book Appointment API Error:", err.response?.data || err.message);
-    return { success: false, message: err.response?.data?.message || err.message };
+    return {
+      success: true,
+      status: response.status,
+      data: response.data
+    };
+
+  } catch (error: any) {
+    console.error("API Error (bookAppointment2):", error);
+    
+    if (error.response) {
+      // Server responded with error status
+      return {
+        success: false,
+        status: error.response.status,
+        data: error.response.data,
+        message: error.response.data?.message || "Booking failed"
+      };
+    } else if (error.request) {
+      // Request made but no response received
+      return {
+        success: false,
+        status: 0,
+        data: { message: "No response from server" },
+        message: "Network error"
+      };
+    } else {
+      // Something else happened
+      return {
+        success: false,
+        status: 0,
+        data: { message: error.message },
+        message: error.message || "Unexpected error"
+      };
+    }
   }
 };
-
-
-
 
 export default api;

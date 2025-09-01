@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 
 const bookingSchema = new mongoose.Schema(
   {
+    customerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
+      required: true, // ✅ strictly required
+    },
     name: {
       type: String,
       required: true,
@@ -53,5 +58,4 @@ const bookingSchema = new mongoose.Schema(
 );
 
 const Booking = mongoose.model("Booking", bookingSchema);
-
 export default Booking;

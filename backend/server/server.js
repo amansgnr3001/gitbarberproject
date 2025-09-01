@@ -10,6 +10,8 @@ import connectDB from "./db.js";
 import Service from "../model/service.js";
 import ServiceTiming from "../model/slot.js";
 import cron from "node-cron";
+ 
+import Booking  from "../model/booking.js";
 
 dotenv.config();
 
@@ -474,24 +476,21 @@ app.get("/api/services/by-gender/:gender", authenticateCustomer, async (req, res
 //get timeslots
 app.get("/api/service-timings", async (req, res) => {
   try {
-    const timings = await ServiceTiming.findOne();
-    console.log(timings);
-    
+    const timings = await ServiceTiming.findOne(); // 👈 fetch one timing doc
 
-    const formattedTimings = timings.map((timing) => ({
-      morning: {
-        startTime: timing.morning.startTime,
-        endTime: timing.morning.endTime,
-      },
-      evening: {
-        startTime: timing.evening.startTime,
-        endTime: timing.evening.endTime,
-      },
-    }));
+    if (!timings) {
+      return res.status(404).json({
+        success: false,
+        message: "Service timings not set yet",
+      });
+    }
 
     res.status(200).json({
       success: true,
-      data: formattedTimings,
+      data: {
+        morning: timings.morning,
+        evening: timings.evening,
+      },
     });
   } catch (err) {
     console.error("❌ Error fetching service timings:", err);
@@ -503,7 +502,7 @@ app.get("/api/service-timings", async (req, res) => {
 });
 
 //update timeslot
-app.post("/api/update-timeslot", async (req, res) => {
+app.post("/api/update-timeslot", authenticateCustomer, async (req, res) => {
   try {
     const { slot, duration } = req.body;
 
@@ -549,57 +548,7 @@ app.post("/api/update-timeslot", async (req, res) => {
   }
 });
 
-//reset timeslots daily
-
-app.post("/api/reset-timeslot", async (req, res) => {
-  try {
-    const today = new Date();
-    const todayStr = today.toDateString(); // e.g., "Sat Aug 30 2025"
-
-    // Fetch the first timing document
-    let timing = await ServiceTiming.findOne();
-
-    if (!timing) {
-      // If no document exists, create one with initial values
-      timing = new ServiceTiming({
-        morning: { startTime: 540, endTime: 720 }, // 9:00 AM to 12:00 PM
-        evening: { startTime: 870, endTime: 1020 }, // 2:30 PM to 5:00 PM
-        lastResetDate: todayStr,
-      });
-      await timing.save();
-      return res.status(200).json({
-        success: true,
-        message: "Time slots initialized for today",
-        data: timing,
-      });
-    }
-
-    // Check last reset date
-    if (timing.lastResetDate === todayStr) {
-      return res.status(200).json({
-        success: true,
-        message: "Time slots already reset today",
-        data: timing,
-      });
-    }
-
-    // Reset start times to initial values
-    timing.morning.startTime = 540; // 9:00 AM in minutes
-    timing.evening.startTime = 870; // 2:30 PM in minutes
-    timing.lastResetDate = todayStr;
-
-    await timing.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Time slots reset for today",
-      data: timing,
-    });
-  } catch (err) {
-    console.error("❌ Error resetting time slots:", err);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-});
+ 
 cron.schedule("0 0 * * *", async () => {
   try {
     const today = new Date().toDateString();
@@ -629,6 +578,8 @@ cron.schedule("0 0 * * *", async () => {
 });
 
 
+ 
+
 app.post("/api/bookings", authenticateCustomer, async (req, res) => {
   try {
     const {
@@ -642,6 +593,7 @@ app.post("/api/bookings", authenticateCustomer, async (req, res) => {
       totalCost,
     } = req.body;
 
+    // ✅ Validate required fields
     if (
       !name ||
       !phoneNumber ||
@@ -652,13 +604,11 @@ app.post("/api/bookings", authenticateCustomer, async (req, res) => {
       !timeSlot ||
       !totalCost
     ) {
-      return res
-        .status(400)
-        .json({ message: "Please provide all required fields" });
+      return res.status(400).json({ message: "Please provide all required fields" });
     }
 
     const booking = new Booking({
-      customerId: req.customer._id, // from token
+      customerId: req.customer._id, // ✅ from token (authenticateCustomer)
       name,
       phoneNumber,
       email,
@@ -672,12 +622,13 @@ app.post("/api/bookings", authenticateCustomer, async (req, res) => {
     await booking.save();
 
     res.status(201).json({
+      success: true,
       message: "Booking created successfully",
       booking,
     });
   } catch (error) {
-    console.error("❌ Booking Error:", error.message);
-    res.status(500).json({ message: "Server error" });
+    console.error("❌ Booking Error:", error);
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 });
 
